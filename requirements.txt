@@ -1,2 +1,5 @@
-flask==1.1.2
-cloudevents==1.2.0
+flask
+cloudevents
+PyYAML
+pyvmomi
+python-dotenv

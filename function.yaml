@@ -1,0 +1,118 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vcconfig-cm
+data:
+  VC_SERVER: vcsa.local # hostname of your vCenter
+  VC_USER: test@vsphere.local # service account name for the function
+  VC_SSLVERIFY: True # Verify the SSL certificate of the vCenter server?
+  VC_ATTR_OWNER: event-owner
+  VC_ATTR_CREATION_DATE: event-creation_date
+  VC_ATTR_LAST_POWEREDON: event-last_poweredon
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vcconfig-secret
+  labels:
+    app: kn-vm-creation-attr-fn
+type: Opaque
+data:
+  VC_PASSWORD: Vk13YXJlMSEK # base64 encoded password
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: kn-vm-creation-attr-fn-service
+  labels:
+    app: kn-vm-creation-attr-fn
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: "1"
+        autoscaling.knative.dev/minScale: "1"
+    spec:
+      containers:
+      - image: lrivallain/kn-vm-creation-attr-fn
+        envFrom:
+        - secretRef:
+            name: vcconfig-secret
+        - configMapRef:
+            name: vcconfig-cm
+---
+# Here is a list of triggers with event type filtering to match multiple kind of VM events
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: kn-vm-creation-attr-fn-trigger-vmcreated
+  labels:
+    app: kn-vm-creation-attr-fn
+spec:
+  broker: vmware-event-broker
+  filter:
+    attributes:
+      type: com.vmware.event.router/event
+      subject: VmCreatedEvent
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: kn-vm-creation-attr-fn
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: kn-vm-creation-attr-fn-trigger-vmcloned
+  labels:
+    app: kn-vm-creation-attr-fn
+spec:
+  broker: vmware-event-broker
+  filter:
+    attributes:
+      type: com.vmware.event.router/event
+      subject: VmClonedEvent
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: kn-vm-creation-attr-fn
+
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: kn-vm-creation-attr-fn-trigger-vmregistered
+  labels:
+    app: kn-vm-creation-attr-fn
+spec:
+  broker: vmware-event-broker
+  filter:
+    attributes:
+      type: com.vmware.event.router/event
+      subject: VmRegisteredEvent
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: kn-vm-creation-attr-fn
+
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: kn-vm-creation-attr-fn-trigger-drsvmpoweredon
+  labels:
+    app: kn-vm-creation-attr-fn
+spec:
+  broker: vmware-event-broker
+  filter:
+    attributes:
+      type: com.vmware.event.router/event
+      subject: DrsVmPoweredOnEvent
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: kn-vm-creation-attr-fn
